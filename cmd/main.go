@@ -29,13 +29,13 @@ func main() {
 	}
 
 	// Process geographic data - countries (paises)
-	if err := app.ReaderService.Read("files/distritos.xlsx", "Data"); err != nil {
-		log.Fatalf("Failed to read distritos.xlsx: %v", err)
+	if err := app.ReaderService.Read("files/paises.xlsx", "Data"); err != nil {
+		log.Fatalf("Failed to read paises.xlsx: %v", err)
 	}
 
 	// Process geographic data - countries (paises)
-	if err := app.ReaderService.Read("files/paises.xlsx", "Data"); err != nil {
-		log.Fatalf("Failed to read paises.xlsx: %v", err)
+	if err := app.ReaderService.Read("files/distritos.xlsx", "Data"); err != nil {
+		log.Fatalf("Failed to read distritos.xlsx: %v", err)
 	}
 
 	// Process geographic data - municipalities (concelhos)

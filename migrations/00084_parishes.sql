@@ -7,6 +7,7 @@ CREATE TABLE parishes(
 	version VARCHAR(20) NOT NULL,
 	name VARCHAR(255) NOT NULL,
 	code VARCHAR(20) NOT NULL,
+	municipality_id UUID NOT NULL REFERENCES municipalities(id),
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	deleted_at TIMESTAMPTZ NULL,
