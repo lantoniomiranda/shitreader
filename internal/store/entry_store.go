@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -18,23 +19,23 @@ func NewPostgresEntryStore(db *sql.DB) *PostgresEntryStore {
 }
 
 type EntryStore interface {
-	Save(entry *types.Entry, tableName string) error
+	Save(ctx context.Context, entry *types.Entry, tableName string) error
 }
 
-func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
+func (s *PostgresEntryStore) Save(ctx context.Context, entry *types.Entry, tableName string) error {
 	var query string
 	var err error
 
 	switch tableName {
 	case "countries":
-		// Geographic tables with 'name' field
 		query = fmt.Sprintf(`
 			INSERT INTO %s (table_code, version, name, code)
 			VALUES ($1, $2, $3, $4)
 			RETURNING id, created_at, updated_at 
 		`, tableName)
 
-		err = s.db.QueryRow(
+		err = s.db.QueryRowContext(
+			ctx,
 			query,
 			entry.Table,
 			entry.Version,
@@ -43,13 +44,12 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 		).Scan(&entry.Id, &entry.CreatedAt, &entry.UpdatedAt)
 
 	case "districts":
-		// Geographic tables with 'name' field
 		var countryId string
 		queryCountry := `
 		SELECT id FROM countries WHERE code = 'PT' AND deleted_at IS NULL
 		`
 
-		err = s.db.QueryRow(queryCountry).Scan(&countryId)
+		err = s.db.QueryRowContext(ctx, queryCountry).Scan(&countryId)
 		if err != nil {
 			return fmt.Errorf("Error querying country: %w", err)
 		}
@@ -60,7 +60,8 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 			RETURNING id, created_at, updated_at 
 		`, tableName)
 
-		err = s.db.QueryRow(
+		err = s.db.QueryRowContext(
+			ctx,
 			query,
 			entry.Table,
 			entry.Version,
@@ -70,22 +71,21 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 		).Scan(&entry.Id, &entry.CreatedAt, &entry.UpdatedAt)
 
 	case "municipalities":
-		// Geographic tables with 'name' field
 		var districtId string
-		queryCountry := `
+		queryDistrict := `
 		SELECT id FROM districts WHERE code LIKE $1 AND deleted_at IS NULL
 		`
-		firstThreeDigits := ""
-		if len(entry.Code) >= 3 {
-			firstThreeDigits = entry.Code[:2]
+		firstTwoDigits := ""
+		if len(entry.Code) >= 2 {
+			firstTwoDigits = entry.Code[:2]
 		} else {
-			firstThreeDigits = entry.Code
+			firstTwoDigits = entry.Code
 		}
 
-		queryCondition := firstThreeDigits + "%"
-		err = s.db.QueryRow(queryCountry, queryCondition).Scan(&districtId)
+		queryCondition := firstTwoDigits + "%"
+		err = s.db.QueryRowContext(ctx, queryDistrict, queryCondition).Scan(&districtId)
 		if err != nil {
-			return fmt.Errorf("Error querying country: %w", err)
+			return fmt.Errorf("Error querying district: %w", err)
 		}
 
 		query = fmt.Sprintf(`
@@ -94,7 +94,8 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 			RETURNING id, created_at, updated_at 
 		`, tableName)
 
-		err = s.db.QueryRow(
+		err = s.db.QueryRowContext(
+			ctx,
 			query,
 			entry.Table,
 			entry.Version,
@@ -104,9 +105,8 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 		).Scan(&entry.Id, &entry.CreatedAt, &entry.UpdatedAt)
 
 	case "parishes":
-		// Geographic tables with 'name' field
-		var districtId string
-		queryCountry := `
+		var municipalityId string
+		queryMunicipality := `
 		SELECT id FROM municipalities WHERE code LIKE $1 AND deleted_at IS NULL
 		`
 		digits := ""
@@ -117,9 +117,9 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 		}
 
 		queryCondition := digits + "%"
-		err = s.db.QueryRow(queryCountry, queryCondition).Scan(&districtId)
+		err = s.db.QueryRowContext(ctx, queryMunicipality, queryCondition).Scan(&municipalityId)
 		if err != nil {
-			return fmt.Errorf("Error querying country: %w", err)
+			return fmt.Errorf("Error querying municipality: %w", err)
 		}
 
 		query = fmt.Sprintf(`
@@ -128,23 +128,24 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 			RETURNING id, created_at, updated_at 
 		`, tableName)
 
-		err = s.db.QueryRow(
+		err = s.db.QueryRowContext(
+			ctx,
 			query,
 			entry.Table,
 			entry.Version,
 			entry.Name,
 			entry.Code,
-			districtId,
+			municipalityId,
 		).Scan(&entry.Id, &entry.CreatedAt, &entry.UpdatedAt)
 	case "ine_zones":
-		// INE zones with completely different structure
 		query = fmt.Sprintf(`
 			INSERT INTO %s (table_code, version, zone_code, zone_name, zone_name_formatted, ine_municipality_code)
 			VALUES ($1, $2, $3, $4, $5, $6)
 			RETURNING id, created_at, updated_at 
 		`, tableName)
 
-		err = s.db.QueryRow(
+		err = s.db.QueryRowContext(
+			ctx,
 			query,
 			entry.Table,
 			entry.Version,
@@ -155,14 +156,14 @@ func (s *PostgresEntryStore) Save(entry *types.Entry, tableName string) error {
 		).Scan(&entry.Id, &entry.CreatedAt, &entry.UpdatedAt)
 
 	default:
-		// Standard tables (including cae_rev4 and postal_codes)
 		query = fmt.Sprintf(`
 			INSERT INTO %s (table_code, version, code, description)
 			VALUES ($1, $2, $3, $4)
 			RETURNING id, created_at, updated_at 
 		`, tableName)
 
-		err = s.db.QueryRow(
+		err = s.db.QueryRowContext(
+			ctx,
 			query,
 			entry.Table,
 			entry.Version,

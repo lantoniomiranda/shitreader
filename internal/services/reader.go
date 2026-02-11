@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -23,22 +24,19 @@ func NewReaderService(entryStore store.EntryStore) *ReaderService {
 func (s *ReaderService) Read(filePath string, sheetName string) error {
 	fmt.Printf("\n📁 Processando arquivo: %s\n", filePath)
 	
+	ctx := context.Background()
+	
 	file, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
 	}
-	defer func() {
-		if cerr := file.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("error closing file: %w", cerr)
-		}
-	}()
+	defer file.Close()
 
 	rows, err := file.GetRows(sheetName)
 	if err != nil {
 		return fmt.Errorf("error getting rows: %w", err)
 	}
 
-	// Count total rows to process (excluding header rows)
 	totalRows := 0
 	for _, row := range rows {
 		if len(row) > 2 && row[2] != "" {
@@ -53,7 +51,6 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 	var tableName string
 
 	for _, row := range rows {
-		// Header row detection: Either has 2 columns (code+version) OR has 3+ columns with empty 3rd
 		isHeaderRow := len(row) >= 2 && (len(row) == 2 || (len(row) > 2 && row[2] == ""))
 		
 		if isHeaderRow {
@@ -65,19 +62,20 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 			continue
 		}
 
-		// Skip if tableName not set yet or is OTHER
 		if tableName == "" || tableName == "OTHER" {
 			continue
 		}
 
 		entry := parseRow(row, tableName)
 
-		if err := s.entryStore.Save(&entry, tableName); err != nil {
+		if err := s.entryStore.Save(ctx, &entry, tableName); err != nil {
 			return fmt.Errorf("error saving entry: %w", err)
 		}
 
 		processedRows++
-		s.printProgress(processedRows, totalRows, startTime, tableName)
+		if processedRows%10 == 0 || processedRows == totalRows {
+			s.printProgress(processedRows, totalRows, startTime, tableName)
+		}
 	}
 
 	elapsed := time.Since(startTime)
@@ -122,16 +120,14 @@ func parseRow(row []string, tableName string) types.Entry {
 
 	switch tableName {
 	case "countries", "districts", "municipalities", "parishes":
-		// These have: table_code, version, name, code
 		if len(row) > 2 {
-			entry.Name = row[2] // 3rd column is Name
+			entry.Name = row[2]
 		}
 		if len(row) > 3 {
-			entry.Code = row[3] // 4th column is Code
+			entry.Code = row[3]
 		}
 
 	case "ine_zones":
-		// INE zones have: table_code, version, zone_code, zone_name, zone_name_formatted, ine_municipality_code
 		if len(row) > 2 {
 			entry.ZoneCode = row[2]
 		}
@@ -146,7 +142,6 @@ func parseRow(row []string, tableName string) types.Entry {
 		}
 
 	default:
-		// Standard format: table_code, version, code, description
 		if len(row) > 2 {
 			entry.Code = row[2]
 		}

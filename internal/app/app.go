@@ -26,7 +26,7 @@ func NewApplication() (*Application, error) {
 
 	err = store.MigrateFS(pgDb, migrations.FS, ".")
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
 	entryStore := store.NewPostgresEntryStore(pgDb)
