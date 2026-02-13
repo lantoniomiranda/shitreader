@@ -40,4 +40,23 @@ func main() {
 	}
 
 	log.Println("✅ All data imported successfully!")
+
+	log.Println("\n🔗 Starting associations...")
+
+	err = app.AssociationService.Associate()
+	if err != nil {
+		log.Fatalf("Failed to associate fields with records: %v", err)
+	}
+
+	err = app.AssociationService.AssociateRecordTypes("files/record-types.xlsx", "Data")
+	if err != nil {
+		log.Fatalf("Failed to associate records with record types: %v", err)
+	}
+
+	err = app.AssociationService.AssociateSteps("files/passo-registos.xlsx", "Data")
+	if err != nil {
+		log.Fatalf("Failed to associate steps with header types and records: %v", err)
+	}
+
+	log.Println("\n✅ All associations completed successfully!")
 }

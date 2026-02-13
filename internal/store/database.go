@@ -46,8 +46,42 @@ func Open() (*sql.DB, error) {
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 
+	if err := waitForDatabase(db); err != nil {
+		return nil, err
+	}
+
 	fmt.Println("Connected to database...")
 	return db, nil
+}
+
+func waitForDatabase(db *sql.DB) error {
+	const (
+		maxAttempts    = 10
+		initialBackoff = 500 * time.Millisecond
+		maxBackoff     = 5 * time.Second
+	)
+
+	backoff := initialBackoff
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		err := db.Ping()
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		fmt.Printf("Waiting for database (attempt %d/%d): %v\n", attempt, maxAttempts, err)
+		time.Sleep(backoff)
+
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+
+	return fmt.Errorf("Error pinging db after %d attempts: %w", maxAttempts, lastErr)
 }
 
 func MigrateFS(db *sql.DB, migrationsFS fs.FS, dir string) error {

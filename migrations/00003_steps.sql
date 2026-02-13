@@ -7,6 +7,7 @@ CREATE TABLE steps(
 	version VARCHAR(20) NOT NULL,
 	code VARCHAR(20) NOT NULL,
 	description VARCHAR(255) NOT NULL,
+	header_type_id UUID REFERENCES header_types(id),
 	created_at TIMESTAMPTZ DEFAULT NOW(),
 	updated_at TIMESTAMPTZ DEFAULT NOW(),
 	deleted_at TIMESTAMPTZ NULL,

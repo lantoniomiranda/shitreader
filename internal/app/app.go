@@ -10,8 +10,9 @@ import (
 )
 
 type Application struct {
-	ReaderService *services.ReaderService
-	DB            *sql.DB
+	ReaderService      *services.ReaderService
+	AssociationService *services.AssociationService
+	DB                 *sql.DB
 }
 
 func NewApplication() (*Application, error) {
@@ -30,10 +31,14 @@ func NewApplication() (*Application, error) {
 	}
 
 	entryStore := store.NewPostgresEntryStore(pgDb)
+	associationStore := store.NewPostgresAssociationStore(pgDb)
+
 	readerService := services.NewReaderService(entryStore)
+	associationService := services.NewAssociationService(associationStore)
 
 	return &Application{
-		ReaderService: readerService,
-		DB:            pgDb,
+		ReaderService:      readerService,
+		AssociationService: associationService,
+		DB:                 pgDb,
 	}, nil
 }
