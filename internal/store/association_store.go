@@ -25,87 +25,55 @@ type AssociationStore interface {
 	AssociateStepsHeaderTypesAndRecords(ctx context.Context, filePath string, sheetName string) error
 }
 
+// AssociateRecordsFields links each field to its parent record using a single
+// UPDATE ... FROM statement instead of per-row SELECT + UPDATE.
 func (s *PostgresAssociationStore) AssociateRecordsFields(ctx context.Context) error {
-	fmt.Printf("\n🔗 Associating fields with records...\n")
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
 
-	selectFieldsQuery := `
-		SELECT id, code, table_code, version FROM fields WHERE deleted_at IS NULL
+	query := `
+		UPDATE fields f
+		SET record_id = r.id
+		FROM records r
+		WHERE LEFT(f.code, 5) = LEFT(r.code, 5)
+		  AND f.deleted_at IS NULL
+		  AND r.deleted_at IS NULL
+		  AND f.record_id IS NULL
 	`
 
-	rows, err := s.db.QueryContext(ctx, selectFieldsQuery)
+	result, err := tx.ExecContext(ctx, query)
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	associatedCount := 0
-	skippedCount := 0
-
-	for rows.Next() {
-		var id, code, tableCode, version string
-
-		err := rows.Scan(&id, &code, &tableCode, &version)
-		if err != nil {
-			return err
-		}
-
-		recordRoot := code[:5] + "%"
-
-		var recordId string
-		getRecordIdQuery := `
-			SELECT id FROM records 
-			WHERE code LIKE $1 
-			AND deleted_at IS NULL
-			LIMIT 1
-		`
-
-		err = s.db.QueryRowContext(ctx, getRecordIdQuery, recordRoot).Scan(&recordId)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				skippedCount++
-				continue
-			}
-			return fmt.Errorf("failed to query record for field %s (code: %s, table: %s, version: %s): %w", id, code, tableCode, version, err)
-		}
-
-		updateFieldQuery := `
-			UPDATE fields SET record_id = $1 WHERE id = $2
-		`
-
-		_, err = s.db.ExecContext(ctx, updateFieldQuery, recordId, id)
-		if err != nil {
-			return fmt.Errorf("failed to update field %s with record_id %s: %w", id, recordId, err)
-		}
-
-		associatedCount++
-		if associatedCount%100 == 0 {
-			fmt.Printf("  ✓ %d fields processed...\n", associatedCount)
-		}
+		return fmt.Errorf("failed to associate fields with records: %w", err)
 	}
 
-	fmt.Printf("✅ Completed: %d fields associated, %d skipped\n", associatedCount, skippedCount)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit field-record association: %w", err)
+	}
 
+	_ = result
 	return nil
 }
 
-func (s *PostgresAssociationStore) AssociateRecordsRecordTypes(ctx context.Context, filePath string, sheetName string) error {
-	fmt.Printf("\n🔗 Associating records with record types...\n")
+// AssociateRecordsRecordTypes updates records with their record_type_id
+// based on data from an Excel file, wrapped in a single transaction.
 
-	// Open Excel file
+func (s *PostgresAssociationStore) AssociateRecordsRecordTypes(ctx context.Context, filePath string, sheetName string) error {
 	file, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
 	}
 	defer file.Close()
 
-	// Read rows from Excel
 	rows, err := file.GetRows(sheetName)
 	if err != nil {
 		return fmt.Errorf("error getting rows: %w", err)
 	}
 
-	// Load all record types from database into a map
-	recordTypesMap := make(map[string]string) // key: record_type_code, value: record_type_id
+	// Load all record types from database into a map.
+	recordTypesMap := make(map[string]string)
 	recordTypesQuery := `SELECT id, code FROM record_types WHERE deleted_at IS NULL`
 
 	recordTypeRows, err := s.db.QueryContext(ctx, recordTypesQuery)
@@ -122,39 +90,37 @@ func (s *PostgresAssociationStore) AssociateRecordsRecordTypes(ctx context.Conte
 		recordTypesMap[code] = id
 	}
 
-	fmt.Printf("  Loaded %d record types\n", len(recordTypesMap))
+	// Begin a single transaction for all updates.
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
 
 	associatedCount := 0
 	skippedCount := 0
 
-	// Iterate through Excel rows (skip header row)
 	for i, row := range rows {
-		// Skip header row
 		if i == 0 {
 			continue
 		}
-
-		// Skip rows that don't have at least 3 columns
 		if len(row) < 3 {
 			continue
 		}
 
-		recordCode := row[1]     // Column 1: Record code (e.g., R000000)
-		recordTypeCode := row[2] // Column 2: Record type (e.g., 1, 2)
+		recordCode := row[1]
+		recordTypeCode := row[2]
 
-		// Skip empty rows
 		if recordCode == "" || recordTypeCode == "" {
 			continue
 		}
 
-		// Find the record_type_id from the map
 		recordTypeId, exists := recordTypesMap[recordTypeCode]
 		if !exists {
 			skippedCount++
 			continue
 		}
 
-		// Update the record with the record_type_id
 		updateQuery := `
 			UPDATE records 
 			SET record_type_id = $1 
@@ -162,7 +128,7 @@ func (s *PostgresAssociationStore) AssociateRecordsRecordTypes(ctx context.Conte
 			AND deleted_at IS NULL
 		`
 
-		result, err := s.db.ExecContext(ctx, updateQuery, recordTypeId, recordCode)
+		result, err := tx.ExecContext(ctx, updateQuery, recordTypeId, recordCode)
 		if err != nil {
 			return fmt.Errorf("failed to update record %s with record_type_id %s: %w", recordCode, recordTypeId, err)
 		}
@@ -178,34 +144,33 @@ func (s *PostgresAssociationStore) AssociateRecordsRecordTypes(ctx context.Conte
 		}
 
 		associatedCount++
-		if associatedCount%100 == 0 {
-			fmt.Printf("  ✓ %d records processed...\n", associatedCount)
-		}
+		// No per-record logging to keep output minimal.
 	}
 
-	fmt.Printf("✅ Completed: %d records associated, %d skipped\n", associatedCount, skippedCount)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit record-type association: %w", err)
+	}
 
 	return nil
 }
 
-func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx context.Context, filePath string, sheetName string) error {
-	fmt.Printf("\n🔗 Associating steps with header types and records...\n")
+// AssociateStepsHeaderTypesAndRecords creates step-header_type and step-record
+// associations from an Excel file, wrapped in a single transaction.
 
-	// Open Excel file
+func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx context.Context, filePath string, sheetName string) error {
 	file, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
 	}
 	defer file.Close()
 
-	// Read rows from Excel
 	rows, err := file.GetRows(sheetName)
 	if err != nil {
 		return fmt.Errorf("error getting rows: %w", err)
 	}
 
-	// Load all header types from database into a map
-	headerTypesMap := make(map[string]string) // key: header_type_code, value: header_type_id
+	// Load all header types from database into a map.
+	headerTypesMap := make(map[string]string)
 	headerTypesQuery := `SELECT id, code FROM header_types WHERE deleted_at IS NULL`
 
 	headerTypeRows, err := s.db.QueryContext(ctx, headerTypesQuery)
@@ -222,10 +187,8 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 		headerTypesMap[code] = id
 	}
 
-	fmt.Printf("  Loaded %d header types\n", len(headerTypesMap))
-
-	// Load all records from database into a map
-	recordsMap := make(map[string]string) // key: record_code, value: record_id
+	// Load all records from database into a map.
+	recordsMap := make(map[string]string)
 	recordsQuery := `SELECT id, code FROM records WHERE deleted_at IS NULL`
 
 	recordRows, err := s.db.QueryContext(ctx, recordsQuery)
@@ -242,10 +205,8 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 		recordsMap[code] = id
 	}
 
-	fmt.Printf("  Loaded %d records\n", len(recordsMap))
-
-	// Load all steps from database into a map
-	stepsMap := make(map[string]string) // key: step_code, value: step_id
+	// Load all steps from database into a map.
+	stepsMap := make(map[string]string)
 	stepsQuery := `SELECT id, code FROM steps WHERE deleted_at IS NULL`
 
 	stepRows, err := s.db.QueryContext(ctx, stepsQuery)
@@ -262,40 +223,28 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 		stepsMap[code] = id
 	}
 
-	fmt.Printf("  Loaded %d steps\n", len(stepsMap))
-
-	processedSteps := 0
-	createdStepHeaderTypes := 0
-	createdStepRecords := 0
-	skippedRows := 0
-
-	// Group records by step code
-	stepRecordsData := make(map[string]struct {
+	// Group records by step code (in-memory, no DB queries in the loop).
+	type stepData struct {
 		headerTypeCodes []string
 		recordCodes     []string
-	})
+	}
+	stepRecordsData := make(map[string]*stepData)
 
-	// Track the last non-empty values for merged cells
 	var lastStepCode string
 	var lastHeaderTypeCode string
 
-	// Iterate through Excel rows (skip header row)
 	for i, row := range rows {
-		// Skip header row
 		if i == 0 {
 			continue
 		}
-
-		// Skip rows that don't have at least 3 columns (need: passo, tipo_cab, registo)
 		if len(row) < 3 {
 			continue
 		}
 
-		stepCode := row[0]       // Column 0: "Passo" (e.g., P1100, P4120)
-		headerTypeCode := row[1] // Column 1: "Tipo Cab." (e.g., I or I,O)
-		recordCode := row[2]     // Column 2: "Registo" (e.g., R000000, R110000)
+		stepCode := row[0]
+		headerTypeCode := row[1]
+		recordCode := row[2]
 
-		// Handle merged cells: use the last non-empty value if current is empty
 		if stepCode != "" {
 			lastStepCode = stepCode
 		} else {
@@ -308,43 +257,42 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 			headerTypeCode = lastHeaderTypeCode
 		}
 
-		// Skip if we still don't have values or record code is empty
 		if stepCode == "" || headerTypeCode == "" || recordCode == "" {
 			continue
 		}
 
-		// Store data grouped by step
-		if _, exists := stepRecordsData[stepCode]; !exists {
-			stepRecordsData[stepCode] = struct {
-				headerTypeCodes []string
-				recordCodes     []string
-			}{
-				headerTypeCodes: []string{},
-				recordCodes:     []string{},
-			}
+		sd, exists := stepRecordsData[stepCode]
+		if !exists {
+			sd = &stepData{}
+			stepRecordsData[stepCode] = sd
 		}
 
-		data := stepRecordsData[stepCode]
-
-		// Handle comma-separated header types
-		if data.headerTypeCodes == nil || len(data.headerTypeCodes) == 0 {
-			// Parse comma-separated header types
+		if len(sd.headerTypeCodes) == 0 {
 			headerTypes := strings.Split(headerTypeCode, ",")
 			for _, ht := range headerTypes {
 				trimmedHT := strings.TrimSpace(ht)
 				if trimmedHT != "" {
-					data.headerTypeCodes = append(data.headerTypeCodes, trimmedHT)
+					sd.headerTypeCodes = append(sd.headerTypeCodes, trimmedHT)
 				}
 			}
 		}
 
-		data.recordCodes = append(data.recordCodes, recordCode)
-		stepRecordsData[stepCode] = data
+		sd.recordCodes = append(sd.recordCodes, recordCode)
 	}
 
-	// Process each step
+	// Begin a single transaction for all inserts.
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	processedSteps := 0
+	createdStepHeaderTypes := 0
+	createdStepRecords := 0
+	skippedRows := 0
+
 	for stepCode, data := range stepRecordsData {
-		// Get step_id
 		stepId, stepExists := stepsMap[stepCode]
 		if !stepExists {
 			skippedRows++
@@ -353,7 +301,7 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 
 		processedSteps++
 
-		// Create step_header_types associations for ALL header types
+		// Create step_header_types associations.
 		for _, headerTypeCode := range data.headerTypeCodes {
 			headerTypeId, headerTypeExists := headerTypesMap[headerTypeCode]
 			if !headerTypeExists {
@@ -361,14 +309,13 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 				continue
 			}
 
-			// Insert step_header_type association
 			insertHeaderTypeQuery := `
 				INSERT INTO step_header_types (step_id, header_type_id)
 				VALUES ($1, $2)
 				ON CONFLICT (step_id, header_type_id) DO NOTHING
 			`
 
-			_, err := s.db.ExecContext(ctx, insertHeaderTypeQuery, stepId, headerTypeId)
+			_, err := tx.ExecContext(ctx, insertHeaderTypeQuery, stepId, headerTypeId)
 			if err != nil {
 				return fmt.Errorf("failed to create step_header_type for step %s and header type %s: %w", stepCode, headerTypeCode, err)
 			}
@@ -376,7 +323,7 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 			createdStepHeaderTypes++
 		}
 
-		// Create step_records associations
+		// Create step_records associations.
 		for _, recordCode := range data.recordCodes {
 			recordId, recordExists := recordsMap[recordCode]
 			if !recordExists {
@@ -384,14 +331,13 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 				continue
 			}
 
-			// Insert step_record association
 			insertQuery := `
 				INSERT INTO step_records (step_id, record_id)
 				VALUES ($1, $2)
 				ON CONFLICT (step_id, record_id) DO NOTHING
 			`
 
-			_, err := s.db.ExecContext(ctx, insertQuery, stepId, recordId)
+			_, err := tx.ExecContext(ctx, insertQuery, stepId, recordId)
 			if err != nil {
 				return fmt.Errorf("failed to create step_record for step %s and record %s: %w", stepCode, recordCode, err)
 			}
@@ -399,13 +345,12 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 			createdStepRecords++
 		}
 
-		if processedSteps%10 == 0 {
-			fmt.Printf("  ✓ %d steps processed...\n", processedSteps)
-		}
+		// Silence per-step logging to keep output minimal.
 	}
 
-	fmt.Printf("✅ Completed: %d steps processed, %d step-header_type associations, %d step-record associations, %d rows skipped\n",
-		processedSteps, createdStepHeaderTypes, createdStepRecords, skippedRows)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit step associations: %w", err)
+	}
 
 	return nil
 }

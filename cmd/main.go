@@ -1,7 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/lantoniomiranda/shitreader/internal/app"
@@ -10,6 +14,11 @@ import (
 type fileConfig struct {
 	path  string
 	sheet string
+}
+
+type task struct {
+	name string
+	run  func() error
 }
 
 func main() {
@@ -33,30 +42,72 @@ func main() {
 		{"files/ine-zonas.xlsx", "Data"},
 	}
 
+	tasks := make([]task, 0, len(files)+3)
 	for _, file := range files {
-		if err := app.ReaderService.Read(file.path, file.sheet); err != nil {
-			log.Fatalf("Failed to read %s: %v", file.path, err)
+		file := file
+		tasks = append(tasks, task{
+			name: fmt.Sprintf("Import %s", filepath.Base(file.path)),
+			run: func() error {
+				return app.ReaderService.Read(file.path, file.sheet)
+			},
+		})
+	}
+
+	tasks = append(tasks,
+		task{
+			name: "Associate fields with records",
+			run: func() error {
+				return app.AssociationService.Associate()
+			},
+		},
+		task{
+			name: "Associate record types",
+			run: func() error {
+				return app.AssociationService.AssociateRecordTypes("files/record-types.xlsx", "Data")
+			},
+		},
+		task{
+			name: "Associate steps",
+			run: func() error {
+				return app.AssociationService.AssociateSteps("files/passo-registos.xlsx", "Data")
+			},
+		},
+	)
+
+	totalTasks := len(tasks)
+	start := time.Now()
+
+	renderProgress(0, totalTasks, "Starting...", start)
+
+	for i, task := range tasks {
+		renderProgress(i, totalTasks, task.name, start)
+		if err := task.run(); err != nil {
+			log.Fatalf("Task %q failed: %v", task.name, err)
 		}
 	}
 
-	log.Println("✅ All data imported successfully!")
+	renderProgress(totalTasks, totalTasks, "Completed\n", start)
+	fmt.Printf("\nAll tasks finished in %s\n", time.Since(start).Round(time.Millisecond))
+}
 
-	log.Println("\n🔗 Starting associations...")
-
-	err = app.AssociationService.Associate()
-	if err != nil {
-		log.Fatalf("Failed to associate fields with records: %v", err)
+func renderProgress(completed, total int, current string, start time.Time) {
+	if total == 0 {
+		return
 	}
-
-	err = app.AssociationService.AssociateRecordTypes("files/record-types.xlsx", "Data")
-	if err != nil {
-		log.Fatalf("Failed to associate records with record types: %v", err)
+	barWidth := 40
+	percent := float64(completed) / float64(total)
+	filled := int(percent * float64(barWidth))
+	if filled > barWidth {
+		filled = barWidth
 	}
-
-	err = app.AssociationService.AssociateSteps("files/passo-registos.xlsx", "Data")
-	if err != nil {
-		log.Fatalf("Failed to associate steps with header types and records: %v", err)
-	}
-
-	log.Println("\n✅ All associations completed successfully!")
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+	elapsed := time.Since(start).Round(time.Millisecond)
+	fmt.Printf("\r[%s] %2.0f%% %d/%d | Elapsed: %s | Current: %s",
+		bar,
+		percent*100,
+		completed,
+		total,
+		elapsed,
+		current,
+	)
 }
