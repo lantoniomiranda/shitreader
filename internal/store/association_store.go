@@ -74,7 +74,12 @@ func (s *PostgresAssociationStore) AssociateRecordsRecordTypes(ctx context.Conte
 
 	// Load all record types from database into a map.
 	recordTypesMap := make(map[string]string)
-	recordTypesQuery := `SELECT id, code FROM record_types WHERE deleted_at IS NULL`
+	recordTypesQuery := `
+		SELECT cv.id, cv.code 
+		FROM catalog_values cv
+		JOIN catalogs c ON cv.catalog_id = c.id
+		WHERE c.slug = 'record_types' AND cv.deleted_at IS NULL
+	`
 
 	recordTypeRows, err := s.db.QueryContext(ctx, recordTypesQuery)
 	if err != nil {
@@ -171,7 +176,12 @@ func (s *PostgresAssociationStore) AssociateStepsHeaderTypesAndRecords(ctx conte
 
 	// Load all header types from database into a map.
 	headerTypesMap := make(map[string]string)
-	headerTypesQuery := `SELECT id, code FROM header_types WHERE deleted_at IS NULL`
+	headerTypesQuery := `
+		SELECT cv.id, cv.code 
+		FROM catalog_values cv
+		JOIN catalogs c ON cv.catalog_id = c.id
+		WHERE c.slug = 'header_types' AND cv.deleted_at IS NULL
+	`
 
 	headerTypeRows, err := s.db.QueryContext(ctx, headerTypesQuery)
 	if err != nil {

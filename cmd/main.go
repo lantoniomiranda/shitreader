@@ -55,6 +55,12 @@ func main() {
 
 	tasks = append(tasks,
 		task{
+			name: "Inspect processo-passos.xlsx",
+			run: func() error {
+				return app.ReaderService.ReadProcessSteps("files/processo-passos.xlsx", "Data")
+			},
+		},
+		task{
 			name: "Associate fields with records",
 			run: func() error {
 				return app.AssociationService.Associate()
