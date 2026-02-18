@@ -104,101 +104,101 @@ const (
 
 var TableCodeMap = map[string]string{
 	// Tabelas Principais (Estrutura da Mensagem)
-	"T00010": TABLE_PROCESSES,    // Tabela de processos
-	"T00020": TABLE_STEPS,        // Tabela de passos
-	"T00040": TABLE_RECORDS,      // Tabela de registos
-	"T00050": TABLE_FIELDS,       // Tabela de campos
-	"T00060": TABLE_HEADER_TYPES, // Tipos de cabeçalho
-	"T00070": TABLE_RECORD_TYPES, // Tipos de registo
+	"T00010": TABLE_PROCESSES,
+	"T00020": TABLE_STEPS,
+	"T00040": TABLE_RECORDS,
+	"T00050": TABLE_FIELDS,
+	"T00060": TABLE_HEADER_TYPES,
+	"T00070": TABLE_RECORD_TYPES,
 
 	// Tabelas de Erros
-	"T05010": TABLE_SYNTAX_ERRORS, // Erros de sintaxe
-	"T05020": TABLE_DATA_ERRORS,   // Erros de preenchimento
+	"T05010": TABLE_SYNTAX_ERRORS,
+	"T05020": TABLE_DATA_ERRORS,
 
 	// Tabelas Geográficas e Agentes
-	"T10020": TABLE_ELECTRICAL_UNITS,   // Unidades de medida eletricas
-	"T10051": TABLE_CAE_REV4,           // Tabela CAE Rev.4
-	"T10110": TABLE_COUNTRIES,          // Tabela de Países
-	"T10120": TABLE_DISTRICTS,          // Tabela de Distritos
-	"T10130": TABLE_MUNICIPALITIES,     // Tabela de Concelhos
-	"T10140": TABLE_PARISHES,           // Tabela de Freguesias
-	"T10150": TABLE_INE_ZONES,          // Tabela de Zonas INE
-	"T10210": TABLE_POSTAL_CODES,       // Tabela de Códigos Postais
-	"T10300": TABLE_AGENT_TYPES,        // Tipos de agentes
-	"T10310": TABLE_NETWORK_OPERATORS,  // Tabela de operadores de Rede
-	"T10320": TABLE_RETAILERS,          // Tabela de comercializadores
-	"T10380": TABLE_LOGISTICS_OPERATOR, // Operador Logístico de Mudança de Comercializador
+	"T10020": TABLE_ELECTRICAL_UNITS,
+	"T10051": TABLE_CAE_REV4,
+	"T10110": TABLE_COUNTRIES,
+	"T10120": TABLE_DISTRICTS,
+	"T10130": TABLE_MUNICIPALITIES,
+	"T10140": TABLE_PARISHES,
+	"T10150": TABLE_INE_ZONES,
+	"T10210": TABLE_POSTAL_CODES,
+	"T10300": TABLE_AGENT_TYPES,
+	"T10310": TABLE_NETWORK_OPERATORS,
+	"T10320": TABLE_RETAILERS,
+	"T10380": TABLE_LOGISTICS_OPERATOR,
 
 	// Tabelas Técnicas (Ponto de Entrega / Instalação)
-	"T12110": TABLE_SERVICE_QUALITY_ZONES,  // Zonas de qualidade de serviço
-	"T12210": TABLE_VOLTAGE_LEVELS,         // Níveis de tensão
-	"T12215": TABLE_DELIVERY_POINT_TYPES,   // Tipos de pontos de entrega
-	"T12217": TABLE_INSTALLATION_CHARS,     // Características da instalação
-	"T12220": TABLE_MEASUREMENT_VOLTAGE,    // Tensão de medida
-	"T12225": TABLE_REPORTING_VOLTAGE,      // Tensão de medida reporting
-	"T12230": TABLE_NUMBER_OF_PHASES,       // Número de fases
-	"T12510": TABLE_CONTRACTED_POWER,       // Potência contratada
-	"T12520": TABLE_CONSUMPTION_PROFILE,    // Perfil de consumo
-	"T12610": TABLE_DELIVERY_POINT_CONTACT, // Contacto do PE
+	"T12110": TABLE_SERVICE_QUALITY_ZONES,
+	"T12210": TABLE_VOLTAGE_LEVELS,
+	"T12215": TABLE_DELIVERY_POINT_TYPES,
+	"T12217": TABLE_INSTALLATION_CHARS,
+	"T12220": TABLE_MEASUREMENT_VOLTAGE,
+	"T12225": TABLE_REPORTING_VOLTAGE,
+	"T12230": TABLE_NUMBER_OF_PHASES,
+	"T12510": TABLE_CONTRACTED_POWER,
+	"T12520": TABLE_CONSUMPTION_PROFILE,
+	"T12610": TABLE_DELIVERY_POINT_CONTACT,
 
 	// Tabelas de Cliente e Identificação
-	"T13010": TABLE_IDENTIFICATION_TYPES,   // Tipos de identificação
-	"T13020": TABLE_CUSTOMER_TYPES,         // Tipos de cliente
-	"T13110": TABLE_HOLDER_ADDRESS_TYPES,   // Tipos de morada titular
-	"T13210": TABLE_CNE_IDENTIFICATION,     // Identificação do CNE
-	"T13220": TABLE_CNE_CONTACT,            // Contacto do CNE
-	"T13230": TABLE_CNE_PREFERRED_CONTACT,  // Contacto preferencial do CNE
-	"T13240": TABLE_DEFICIENCY_EQUIPMENT,   // Tipos de deficiência/Equipamento
-	"T13310": TABLE_PRIORITY_CUSTOMER_LOC,  // Tipos de local Cliente Prioritário
-	"T13320": TABLE_MR_CONTRACTING_REASONS, // Motivos de contratação MR
-	"T13330": TABLE_RPE_ACCESS_PURPOSE,     // Finalidade do acesso ao RPE
+	"T13010": TABLE_IDENTIFICATION_TYPES,
+	"T13020": TABLE_CUSTOMER_TYPES,
+	"T13110": TABLE_HOLDER_ADDRESS_TYPES,
+	"T13210": TABLE_CNE_IDENTIFICATION,
+	"T13220": TABLE_CNE_CONTACT,
+	"T13230": TABLE_CNE_PREFERRED_CONTACT,
+	"T13240": TABLE_DEFICIENCY_EQUIPMENT,
+	"T13310": TABLE_PRIORITY_CUSTOMER_LOC,
+	"T13320": TABLE_MR_CONTRACTING_REASONS,
+	"T13330": TABLE_RPE_ACCESS_PURPOSE,
 
 	// Tabelas de Medição e Equipamento
-	"T14050": TABLE_EQUIPMENT_BRANDS,           // Marcas de equipamentos
-	"T14060": TABLE_MEASUREMENT_DEVICE_TYPE,    // Tipo de aparelho de medição
-	"T14070": TABLE_OWNERSHIP,                  // Propriedade
-	"T14080": TABLE_MEASUREMENT_DEVICE_FUNC,    // Função do aparelho de medição
-	"T14110": TABLE_SUPPORTED_MEASUREMENT_FUNC, // Funções de medida suportadas
-	"T14120": TABLE_MEASUREMENT_VARIABLE,       // Variavél de medida
-	"T14210": TABLE_ALLOWED_CYCLES,             // Ciclos permitidos
-	"T14220": TABLE_TIME_CYCLES,                // Ciclos horários
-	"T14310": TABLE_DATA_COLLECTION_TYPE,       // Tipo de recolha de dados
-	"T14320": TABLE_COLLECTED_DATA_TYPE,        // Tipo de dados recolhidos
-	"T14410": TABLE_TIME_PERIODS,               // Períodos horários
-	"T14420": TABLE_RECORDERS,                  // Registadores
-	"T14430": TABLE_RECORDER_TYPE,              // Tipo de registador
-	"T14510": TABLE_MOVEMENT_TYPE,              // Tipo de movimento
-	"T14620": TABLE_READING_REASONS,            // Motivos de leitura
-	"T14650": TABLE_READING_TYPE,               // Tipo de leitura
-	"T14670": TABLE_READING_STATUS,             // Status da leitura
-	"T14680": TABLE_READING_STATE,              // Estado da leitura
-	"T14810": TABLE_ESTIMATION_METHODS,         // Metodos de estimativa
+	"T14050": TABLE_EQUIPMENT_BRANDS,
+	"T14060": TABLE_MEASUREMENT_DEVICE_TYPE,
+	"T14070": TABLE_OWNERSHIP,
+	"T14080": TABLE_MEASUREMENT_DEVICE_FUNC,
+	"T14110": TABLE_SUPPORTED_MEASUREMENT_FUNC,
+	"T14120": TABLE_MEASUREMENT_VARIABLE,
+	"T14210": TABLE_ALLOWED_CYCLES,
+	"T14220": TABLE_TIME_CYCLES,
+	"T14310": TABLE_DATA_COLLECTION_TYPE,
+	"T14320": TABLE_COLLECTED_DATA_TYPE,
+	"T14410": TABLE_TIME_PERIODS,
+	"T14420": TABLE_RECORDERS,
+	"T14430": TABLE_RECORDER_TYPE,
+	"T14510": TABLE_MOVEMENT_TYPE,
+	"T14620": TABLE_READING_REASONS,
+	"T14650": TABLE_READING_TYPE,
+	"T14670": TABLE_READING_STATUS,
+	"T14680": TABLE_READING_STATE,
+	"T14810": TABLE_ESTIMATION_METHODS,
 
 	// Tabelas de Fluxo e Motivação
-	"T20100": TABLE_YES_NO_RESPONSE,            // Resposta S/N
-	"T20101": TABLE_ACCEPTANCE_RESPONSE,        // Resposta S/N - Aceitação
-	"T20102": TABLE_HOLDER_CHANGE_CONTEXT,      // Contexto Alteração de Titular
-	"T20200": TABLE_SOCIAL_TARIFF,              // Tarifa social
-	"T21151": TABLE_CANCELLATION_REASON,        // Código de motivo de anulação
-	"T21510": TABLE_TERMINATION_REASON,         // Código de motivo de denúncia
-	"T23100": TABLE_SUSPENSION_REACTIVATION,    // Suspensão/Reactivação
-	"T23110": TABLE_PROCESS_SUSPENSION_REASONS, // Motivos de suspensão/reactivação do processo
-	"T23160": TABLE_INCIDENCE_REASONS,          // Motivos de incidência
-	"T23165": TABLE_INCIDENCE_ORDINAL,          // Ordinal de incidência
-	"T23166": TABLE_INCIDENCE_RESPONSIBILITY,   // Responsabilidade da incidência
-	"T23190": TABLE_ANOMALY_TYPE_FRAUD,         // Tipo de anomalia - Fraude
-	"T23196": TABLE_ORD_INFO_TYPE,              // Tipo de informação facultada pelo ORD
-	"T23200": TABLE_PROOF_DOCUMENT_TYPE,        // Tipo de documento comprovativo
-	"T23210": TABLE_DP_SUPPLY_STATUS,           // Estado do fornecimento do PE
-	"T23230": TABLE_PRODUCTION_TYPE,            // Tipo de produção
-	"T23250": TABLE_SUBPROCESS_CODE,            // Código de subprocesso
-	"T24120": TABLE_OBJECTION_REASONS,          // Motivos de objeção
-	"T24150": TABLE_REFUSAL_REASONS,            // Motivos de recusa
-	"T25100": TABLE_ACTIVATION_TYPE,            // Tipo de ativação
-	"T25140": TABLE_SERVICES_TO_PERFORM,        // Serviços a efectuar
-	"T25150": TABLE_COMMUNICATION_TYPE,         // Tipo de comunicação
-	"T26100": TABLE_ACCESS_TARIFFS,             // Tarifas de acesso
-	"T26110": TABLE_DP_NETWORK_AREA,            // Área de rede do ponto de entrega
-	"T29000": TABLE_RECIPIENT,                  // Destinatário
-	"T29100": TABLE_DEADLINE_IDENTIFIERS,       // Identificadores dos prazos
+	"T20100": TABLE_YES_NO_RESPONSE,
+	"T20101": TABLE_ACCEPTANCE_RESPONSE,
+	"T20102": TABLE_HOLDER_CHANGE_CONTEXT,
+	"T20200": TABLE_SOCIAL_TARIFF,
+	"T21151": TABLE_CANCELLATION_REASON,
+	"T21510": TABLE_TERMINATION_REASON,
+	"T23100": TABLE_SUSPENSION_REACTIVATION,
+	"T23110": TABLE_PROCESS_SUSPENSION_REASONS,
+	"T23160": TABLE_INCIDENCE_REASONS,
+	"T23165": TABLE_INCIDENCE_ORDINAL,
+	"T23166": TABLE_INCIDENCE_RESPONSIBILITY,
+	"T23190": TABLE_ANOMALY_TYPE_FRAUD,
+	"T23196": TABLE_ORD_INFO_TYPE,
+	"T23200": TABLE_PROOF_DOCUMENT_TYPE,
+	"T23210": TABLE_DP_SUPPLY_STATUS,
+	"T23230": TABLE_PRODUCTION_TYPE,
+	"T23250": TABLE_SUBPROCESS_CODE,
+	"T24120": TABLE_OBJECTION_REASONS,
+	"T24150": TABLE_REFUSAL_REASONS,
+	"T25100": TABLE_ACTIVATION_TYPE,
+	"T25140": TABLE_SERVICES_TO_PERFORM,
+	"T25150": TABLE_COMMUNICATION_TYPE,
+	"T26100": TABLE_ACCESS_TARIFFS,
+	"T26110": TABLE_DP_NETWORK_AREA,
+	"T29000": TABLE_RECIPIENT,
+	"T29100": TABLE_DEADLINE_IDENTIFIERS,
 }

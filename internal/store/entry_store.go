@@ -7,19 +7,19 @@ import (
 	"strings"
 
 	"github.com/lantoniomiranda/shitreader/internal/types"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type PostgresEntryStore struct {
 	db *sql.DB
 
-	// Cached parent lookups, populated lazily.
 	countryPTId    string
-	districtCache  map[string]string // code prefix (2 digits) -> id
-	municipalCache map[string]string // code prefix (4 digits) -> id
+	districtCache  map[string]string
+	municipalCache map[string]string
 
-	// Normalization caches
-	tableVersionCache map[string]string // "table_code|version" -> id
-	catalogCache      map[string]string // "slug" -> id
+	tableVersionCache map[string]string
+	catalogCache      map[string]string
 }
 
 func NewPostgresEntryStore(db *sql.DB) *PostgresEntryStore {
@@ -64,7 +64,6 @@ func (s *PostgresEntryStore) SaveBatch(ctx context.Context, tx *sql.Tx, entries 
 	}
 }
 
-// Helpers for caches
 func (s *PostgresEntryStore) getTableVersionID(ctx context.Context, tx *sql.Tx, tableCode, version string) (string, error) {
 	key := tableCode + "|" + version
 	if id, ok := s.tableVersionCache[key]; ok {
@@ -72,10 +71,8 @@ func (s *PostgresEntryStore) getTableVersionID(ctx context.Context, tx *sql.Tx, 
 	}
 
 	var id string
-	// Try to find existing
 	err := tx.QueryRowContext(ctx, `SELECT id FROM table_versions WHERE table_code = $1 AND version = $2`, tableCode, version).Scan(&id)
 	if err == sql.ErrNoRows {
-		// Insert new
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO table_versions (table_code, version) VALUES ($1, $2)
 			ON CONFLICT (table_code, version) DO UPDATE SET updated_at = NOW()
@@ -98,9 +95,9 @@ func (s *PostgresEntryStore) getCatalogID(ctx context.Context, tx *sql.Tx, slug 
 	var id string
 	err := tx.QueryRowContext(ctx, `SELECT id FROM catalogs WHERE slug = $1`, slug).Scan(&id)
 	if err == sql.ErrNoRows {
-		// Auto-create catalog
 		name := strings.ReplaceAll(slug, "_", " ")
-		name = strings.Title(name)
+		c := cases.Title(language.English)
+		name = c.String(name)
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO catalogs (slug, name) VALUES ($1, $2)
 			ON CONFLICT (slug) DO UPDATE SET updated_at = NOW()
@@ -115,9 +112,7 @@ func (s *PostgresEntryStore) getCatalogID(ctx context.Context, tx *sql.Tx, slug 
 	return id, nil
 }
 
-// batchInsertStructural handles steps, records, fields (using table_version_id)
 func (s *PostgresEntryStore) batchInsertStructural(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch to avoid "ON CONFLICT ... cannot affect row a second time"
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {
@@ -156,7 +151,6 @@ func (s *PostgresEntryStore) batchInsertStructural(ctx context.Context, tx *sql.
 			args = append(args, tvId, e.Code, e.Description)
 		}
 
-		// Use ON CONFLICT DO UPDATE to handle re-runs or duplicate rows in source
 		conflictTarget := "(table_version_id, code)"
 		updateSet := "SET description = EXCLUDED.description, updated_at = NOW()"
 
@@ -170,9 +164,7 @@ func (s *PostgresEntryStore) batchInsertStructural(ctx context.Context, tx *sql.
 	return nil
 }
 
-// batchInsertCatalog handles all lookup tables (using catalog_values)
 func (s *PostgresEntryStore) batchInsertCatalog(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {
@@ -230,7 +222,6 @@ func (s *PostgresEntryStore) batchInsertCatalog(ctx context.Context, tx *sql.Tx,
 }
 
 func (s *PostgresEntryStore) batchInsertCountries(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {
@@ -282,7 +273,6 @@ func (s *PostgresEntryStore) batchInsertCountries(ctx context.Context, tx *sql.T
 }
 
 func (s *PostgresEntryStore) batchInsertDistricts(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {
@@ -341,7 +331,6 @@ func (s *PostgresEntryStore) batchInsertDistricts(ctx context.Context, tx *sql.T
 }
 
 func (s *PostgresEntryStore) batchInsertMunicipalities(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {
@@ -420,7 +409,6 @@ func (s *PostgresEntryStore) batchInsertMunicipalities(ctx context.Context, tx *
 }
 
 func (s *PostgresEntryStore) batchInsertParishes(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {
@@ -499,7 +487,6 @@ func (s *PostgresEntryStore) batchInsertParishes(ctx context.Context, tx *sql.Tx
 }
 
 func (s *PostgresEntryStore) batchInsertINEZones(ctx context.Context, tx *sql.Tx, entries []types.Entry, tableName string) error {
-	// Deduplicate entries within the batch (using ZoneCode)
 	seen := make(map[string]bool)
 	uniqueEntries := make([]types.Entry, 0, len(entries))
 	for _, e := range entries {

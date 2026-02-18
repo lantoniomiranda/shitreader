@@ -1,7 +1,6 @@
 -- +gooseUp
 -- +goose StatementBegin
 
--- 1. Table Versions
 CREATE TABLE table_versions (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	table_code VARCHAR(50) NOT NULL,
@@ -12,7 +11,6 @@ CREATE TABLE table_versions (
 	CONSTRAINT unique_table_version UNIQUE (table_code, version)
 );
 
--- 2. Catalogs
 CREATE TABLE catalogs (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	slug VARCHAR(100) NOT NULL UNIQUE,
@@ -22,7 +20,6 @@ CREATE TABLE catalogs (
 	deleted_at TIMESTAMPTZ NULL
 );
 
--- 3. Catalog Values
 CREATE TABLE catalog_values (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	catalog_id UUID NOT NULL REFERENCES catalogs(id) ON DELETE CASCADE,
@@ -35,7 +32,6 @@ CREATE TABLE catalog_values (
 	CONSTRAINT unique_catalog_value UNIQUE (catalog_id, table_version_id, code)
 );
 
--- 4. Geography Tables
 CREATE TABLE countries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     table_version_id UUID NOT NULL REFERENCES table_versions(id),
@@ -96,7 +92,6 @@ CREATE TABLE ine_zones (
     CONSTRAINT unique_ine_zones_table_version_code UNIQUE (table_version_id, zone_code)
 );
 
--- 5. Structural Tables
 CREATE TABLE steps (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	table_version_id UUID NOT NULL REFERENCES table_versions(id),
@@ -132,7 +127,6 @@ CREATE TABLE fields (
 	CONSTRAINT unique_fields_version_code UNIQUE (table_version_id, code)
 );
 
--- 6. Association Tables
 CREATE TABLE step_header_types(
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	step_id UUID NOT NULL REFERENCES steps(id) ON DELETE CASCADE,
@@ -159,7 +153,6 @@ CREATE TABLE step_records(
 CREATE INDEX idx_step_records_step_id ON step_records(step_id);
 CREATE INDEX idx_step_records_record_id ON step_records(record_id);
 
--- 7. Process Tables
 CREATE TABLE processes (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	code VARCHAR(20) NOT NULL UNIQUE,

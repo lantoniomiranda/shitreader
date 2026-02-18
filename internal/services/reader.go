@@ -36,7 +36,6 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 		return fmt.Errorf("error getting rows: %w", err)
 	}
 
-	// Begin a single transaction for the entire file import.
 	tx, err := s.entryStore.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
@@ -52,7 +51,6 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 		isHeaderRow := len(row) >= 2 && (len(row) == 2 || (len(row) > 2 && row[2] == ""))
 
 		if isHeaderRow {
-			// Table boundary: flush accumulated entries before switching.
 			if len(pendingEntries) > 0 {
 				if err := s.entryStore.SaveBatch(ctx, tx, pendingEntries, pendingTable); err != nil {
 					return fmt.Errorf("error saving batch: %w", err)
@@ -77,7 +75,6 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 		entry := parseRow(row, tableName)
 		pendingEntries = append(pendingEntries, entry)
 
-		// Flush when the batch threshold is reached.
 		if len(pendingEntries) >= flushThreshold {
 			if err := s.entryStore.SaveBatch(ctx, tx, pendingEntries, pendingTable); err != nil {
 				return fmt.Errorf("error saving batch: %w", err)
@@ -87,7 +84,6 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 		}
 	}
 
-	// Flush any remaining entries.
 	if len(pendingEntries) > 0 {
 		if err := s.entryStore.SaveBatch(ctx, tx, pendingEntries, pendingTable); err != nil {
 			return fmt.Errorf("error saving batch: %w", err)
@@ -102,7 +98,6 @@ func (s *ReaderService) Read(filePath string, sheetName string) error {
 	return nil
 }
 
-// ReadProcessSteps reads processo-passos.xlsx and saves process-step associations
 func (s *ReaderService) ReadProcessSteps(filePath string, sheetName string) error {
 	ctx := context.Background()
 
@@ -121,19 +116,14 @@ func (s *ReaderService) ReadProcessSteps(filePath string, sheetName string) erro
 		return nil
 	}
 
-	// Track last non-empty processo for merged cells
 	var lastProcesso string
 
-	// Group steps by process
 	processesMap := make(map[string][]string)
 
 	for i, row := range rows {
 		if i == 0 {
-			// Skip header row
 			continue
 		}
-
-		// Extract fields: Processo (col 0), Passo (col 1)
 		var processo, passo string
 		if len(row) > 0 {
 			processo = row[0]
@@ -142,37 +132,30 @@ func (s *ReaderService) ReadProcessSteps(filePath string, sheetName string) erro
 			passo = row[1]
 		}
 
-		// Handle merged cells: track last non-empty processo
 		if processo == "" {
 			processo = lastProcesso
 		} else {
 			lastProcesso = processo
 		}
 
-		// Skip empty passo rows (they're just filler for merged cells)
 		if passo == "" {
 			continue
 		}
 
-		// Skip if no processo found
 		if processo == "" {
 			continue
 		}
 
-		// Group steps by process
 		processesMap[processo] = append(processesMap[processo], passo)
 	}
 
-	// Now save to database
 	tx, err := s.entryStore.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// For each process, ensure it exists and link its steps
 	for processCode, stepCodes := range processesMap {
-		// Fetch process description from catalog_values (if it exists from tabelas-dados.xlsx)
 		var description string
 		err := tx.QueryRowContext(ctx, `
 			SELECT COALESCE(cv.description, '')
@@ -185,7 +168,6 @@ func (s *ReaderService) ReadProcessSteps(filePath string, sheetName string) erro
 			return fmt.Errorf("error fetching process description %s: %w", processCode, err)
 		}
 
-		// Insert or get process (with description if available)
 		var processID string
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO processes (code, description)
@@ -197,18 +179,15 @@ func (s *ReaderService) ReadProcessSteps(filePath string, sheetName string) erro
 			return fmt.Errorf("error saving process %s: %w", processCode, err)
 		}
 
-		// For each step in this process, find the step by code and link it
 		for stepOrder, stepCode := range stepCodes {
 			var stepID string
 			err := tx.QueryRowContext(ctx, `
 				SELECT id FROM steps WHERE code = $1 AND deleted_at IS NULL LIMIT 1
 			`, stepCode).Scan(&stepID)
 			if err != nil {
-				// Step might not exist yet, skip for now
 				continue
 			}
 
-			// Link process to step
 			_, err = tx.ExecContext(ctx, `
 				INSERT INTO process_steps (process_id, step_id, step_order)
 				VALUES ($1, $2, $3)
